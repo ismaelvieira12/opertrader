@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tabela da Lobo — Histórico de Operações</title>
+  <meta name="description" content="Registro e histórico das minhas operações de trade." />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>" />
+</head>
+<body>
+  <div class="app">
+    <!-- ===== Topbar ===== -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">🐺</span>
+        <div class="brand-text">
+          <h1 id="tituloApp" contenteditable="true" spellcheck="false" title="Clique para editar o título">TABELA DA LOBO</h1>
+          <p class="brand-sub">Histórico de Operações</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost" id="btnConfig" type="button">⚙️ Banca inicial</button>
+        <button class="btn btn-ghost" id="btnExportar" type="button">⬇️ Exportar</button>
+        <button class="btn btn-ghost" id="btnImportar" type="button">⬆️ Importar</button>
+        <input type="file" id="inputImportar" accept="application/json" hidden />
+      </div>
+    </header>
+
+    <!-- ===== Cards de estatística ===== -->
+    <section class="stats" aria-label="Resumo da banca">
+      <article class="stat-card accent-banca">
+        <span class="stat-label">Banca Atual</span>
+        <strong class="stat-value" id="statBanca">R$ 0,00</strong>
+        <span class="stat-foot" id="statBancaInicial">Inicial: R$ 0,00</span>
+      </article>
+
+      <article class="stat-card">
+        <span class="stat-label">Lucro Líquido</span>
+        <strong class="stat-value" id="statLucro">R$ 0,00</strong>
+        <span class="stat-foot" id="statRoi">ROI: 0,0%</span>
+      </article>
+
+      <article class="stat-card">
+        <span class="stat-label">Taxa de Acerto</span>
+        <strong class="stat-value" id="statWinrate">0%</strong>
+        <div class="winrate-bar"><span id="winrateFill"></span></div>
+      </article>
+
+      <article class="stat-card">
+        <span class="stat-label">Operações</span>
+        <strong class="stat-value" id="statTotal">0</strong>
+        <span class="stat-foot">
+          <span class="pill pill-win"><b id="statWins">0</b> WIN</span>
+          <span class="pill pill-loss"><b id="statLosses">0</b> LOSS</span>
+        </span>
+      </article>
+    </section>
+
+    <div class="grid">
+      <!-- ===== Gráfico ===== -->
+      <section class="card chart-card">
+        <div class="card-head">
+          <h2>Evolução da Banca</h2>
+          <span class="card-note" id="chartNote">Registre operações para ver o gráfico</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="grafico"></canvas>
+        </div>
+      </section>
+
+      <!-- ===== Formulário ===== -->
+      <section class="card form-card">
+        <div class="card-head">
+          <h2>Registrar Operação</h2>
+        </div>
+        <form id="formOp" autocomplete="off">
+          <label class="field">
+            <span>Data</span>
+            <input type="date" id="fData" required />
+          </label>
+
+          <label class="field">
+            <span>Valor por entrada</span>
+            <div class="money-input">
+              <i>$</i>
+              <input type="text" id="fValor" inputmode="decimal" placeholder="0.00" required />
+            </div>
+          </label>
+
+          <div class="field">
+            <span>Resultado</span>
+            <div class="toggle" role="radiogroup" aria-label="Resultado">
+              <button type="button" class="toggle-btn is-active" data-res="WIN" id="tgWin">✔ WIN</button>
+              <button type="button" class="toggle-btn" data-res="LOSS" id="tgLoss">✖ LOSS</button>
+            </div>
+          </div>
+
+          <label class="field">
+            <span id="labelResultado">Lucro ($)</span>
+            <div class="money-input">
+              <i>$</i>
+              <input type="text" id="fResultado" inputmode="decimal" placeholder="0.00" required />
+            </div>
+          </label>
+
+          <button type="submit" class="btn btn-primary btn-block" id="btnSalvar">＋ Adicionar operação</button>
+        </form>
+      </section>
+    </div>
+
+    <!-- ===== Histórico ===== -->
+    <section class="card table-card">
+      <div class="card-head">
+        <h2>Histórico de Operações</h2>
+        <div class="table-tools">
+          <div class="filter" role="tablist">
+            <button class="chip is-active" data-filter="ALL" type="button">Todas</button>
+            <button class="chip" data-filter="WIN" type="button">Wins</button>
+            <button class="chip" data-filter="LOSS" type="button">Losses</button>
+          </div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table id="tabela">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th class="num">Valor entrada</th>
+              <th class="num">Lucro</th>
+              <th class="num">Perda</th>
+              <th class="center">Resultado</th>
+              <th class="num">Saldo da banca</th>
+              <th class="center">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="empty" id="emptyState">
+          <span class="empty-emoji">🐺</span>
+          <p>Nenhuma operação registrada ainda.</p>
+          <small>Use o formulário acima para adicionar a primeira.</small>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Os dados ficam salvos apenas neste navegador. Use <b>Exportar</b> para guardar um backup.</span>
+    </footer>
+  </div>
+
+  <!-- ===== Modal Banca inicial ===== -->
+  <div class="modal" id="modalConfig" hidden>
+    <div class="modal-box">
+      <h3>Definir banca inicial</h3>
+      <p class="modal-desc">Valor com que você começou. A banca atual é calculada a partir dele.</p>
+      <div class="money-input big">
+        <i>$</i>
+        <input type="text" id="mBancaInicial" inputmode="decimal" placeholder="0.00" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="mCancelar" type="button">Cancelar</button>
+        <button class="btn btn-primary" id="mSalvar" type="button">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modal Editar operação ===== -->
+  <div class="modal" id="modalEdit" hidden>
+    <div class="modal-box">
+      <h3>Editar operação</h3>
+      <p class="modal-desc">Altere os dados e salve para atualizar o histórico e a banca.</p>
+      <form id="formEdit" class="modal-form" autocomplete="off">
+        <label class="field">
+          <span>Data</span>
+          <input type="date" id="eData" required />
+        </label>
+        <label class="field">
+          <span>Valor por entrada</span>
+          <div class="money-input"><i>$</i><input type="text" id="eValor" inputmode="decimal" placeholder="0.00" required /></div>
+        </label>
+        <div class="field">
+          <span>Resultado</span>
+          <div class="toggle" role="radiogroup" aria-label="Resultado">
+            <button type="button" class="toggle-btn" data-res="WIN" id="etgWin">✔ WIN</button>
+            <button type="button" class="toggle-btn" data-res="LOSS" id="etgLoss">✖ LOSS</button>
+          </div>
+        </div>
+        <label class="field">
+          <span id="eLabelResultado">Lucro ($)</span>
+          <div class="money-input"><i>$</i><input type="text" id="eResultado" inputmode="decimal" placeholder="0.00" required /></div>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="eCancelar">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="eSalvar">Salvar alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

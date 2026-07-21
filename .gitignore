@@ -1,0 +1,10 @@
+# Config local de preview (não necessária no repositório)
+.claude/
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Backup exportado pelo próprio site
+tabela-da-lobo.json
