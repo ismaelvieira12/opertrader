@@ -1,44 +1,27 @@
 /* ============================================================
-   Tabela da Lobo — histórico de operações
-   Dados persistem em localStorage. Sem dependências externas.
+   Tabela da Lobo — histórico de operações (multiusuário)
+   Login e banco de dados via Supabase. Cada usuário só acessa
+   os próprios dados (garantido pelas regras de RLS no banco).
    ============================================================ */
 
-const STORAGE_KEY = "tradoper_state_v1";
+/* ---------- Cliente Supabase ---------- */
+let supa = null;
+let user = null;
 
-/* ---------- Estado ---------- */
-const defaultState = {
-  titulo: "TABELA DA LOBO",
-  bancaInicial: 25,
-  operacoes: [
-    // Sementes vindas da planilha original (edite/exclua à vontade)
-    { id: 1, data: "2026-07-20", valor: 2.14, resultado: "LOSS", lucro: 0, perda: 2.14 },
-    { id: 2, data: "2026-07-21", valor: 2.76, resultado: "WIN", lucro: 2.62, perda: 0 },
-  ],
-};
+function configurado() {
+  return (
+    typeof SUPABASE_URL === "string" &&
+    typeof SUPABASE_ANON_KEY === "string" &&
+    SUPABASE_URL.startsWith("http") &&
+    !SUPABASE_URL.includes("COLE_AQUI") &&
+    !SUPABASE_ANON_KEY.includes("COLE_AQUI")
+  );
+}
 
-let state = load();
+/* ---------- Estado (cache em memória do usuário logado) ---------- */
+let state = { titulo: "TABELA DA LOBO", bancaInicial: 25, operacoes: [] };
 let filtroAtual = "ALL";
 let resultadoSelecionado = "WIN";
-
-/* ---------- Persistência ---------- */
-function load() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return structuredClone(defaultState);
-    const parsed = JSON.parse(raw);
-    return {
-      titulo: parsed.titulo ?? defaultState.titulo,
-      bancaInicial: Number(parsed.bancaInicial) || 0,
-      operacoes: Array.isArray(parsed.operacoes) ? parsed.operacoes : [],
-    };
-  } catch {
-    return structuredClone(defaultState);
-  }
-}
-
-function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
 
 /* ---------- Utilidades ---------- */
 const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -61,10 +44,6 @@ function fmtDataBR(iso) {
   if (!iso) return "—";
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
-}
-
-function novoId() {
-  return state.operacoes.reduce((max, o) => Math.max(max, o.id), 0) + 1;
 }
 
 // operações ordenadas por data (asc) — base para saldo acumulado e gráfico
@@ -114,7 +93,6 @@ function render() {
 
   renderTabela();
   renderGrafico();
-  save();
 }
 
 /* ---------- Tabela ---------- */
@@ -295,9 +273,69 @@ function renderGrafico() {
   });
 }
 
+/* ============================================================
+   CAMADA DE DADOS (Supabase)
+   ============================================================ */
+
+async function carregarDados() {
+  await carregarPerfil();
+  await carregarOperacoes();
+}
+
+async function carregarPerfil() {
+  const { data, error } = await supa
+    .from("perfil")
+    .select("banca_inicial, titulo")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error) return toast("Erro ao carregar perfil: " + error.message, "err");
+
+  if (!data) {
+    // primeiro acesso do usuário: cria o perfil padrão
+    await supa.from("perfil").insert({ user_id: user.id });
+    state.bancaInicial = 25;
+    state.titulo = "TABELA DA LOBO";
+  } else {
+    state.bancaInicial = Number(data.banca_inicial) || 0;
+    state.titulo = data.titulo || "TABELA DA LOBO";
+  }
+}
+
+async function carregarOperacoes() {
+  const { data, error } = await supa
+    .from("operacoes")
+    .select("id, data, valor, resultado, lucro, perda")
+    .eq("user_id", user.id)
+    .order("data", { ascending: true })
+    .order("id", { ascending: true });
+
+  if (error) return toast("Erro ao carregar operações: " + error.message, "err");
+
+  state.operacoes = (data || []).map((o) => ({
+    id: o.id,
+    data: o.data,
+    valor: Number(o.valor),
+    resultado: o.resultado,
+    lucro: Number(o.lucro),
+    perda: Number(o.perda),
+  }));
+  render();
+}
+
+async function salvarPerfil() {
+  const { error } = await supa.from("perfil").upsert({
+    user_id: user.id,
+    banca_inicial: state.bancaInicial,
+    titulo: state.titulo,
+  });
+  if (error) toast("Erro ao salvar: " + error.message, "err");
+}
+
 /* ---------- Ações CRUD ---------- */
-function adicionarOp(e) {
+async function adicionarOp(e) {
   e.preventDefault();
+  if (!user) return;
   const data = document.getElementById("fData").value;
   const valor = parseMoney(document.getElementById("fValor").value);
   const resultadoVal = parseMoney(document.getElementById("fResultado").value);
@@ -306,29 +344,31 @@ function adicionarOp(e) {
   if (isNaN(valor) || valor < 0) return toast("Valor por entrada inválido.", "err");
   if (isNaN(resultadoVal) || resultadoVal < 0) return toast("Valor do resultado inválido.", "err");
 
-  const op = {
-    id: novoId(),
+  const { error } = await supa.from("operacoes").insert({
+    user_id: user.id,
     data,
     valor,
     resultado: resultadoSelecionado,
     lucro: resultadoSelecionado === "WIN" ? resultadoVal : 0,
     perda: resultadoSelecionado === "LOSS" ? resultadoVal : 0,
-  };
-  state.operacoes.push(op);
-  render();
+  });
+  if (error) return toast("Erro ao salvar: " + error.message, "err");
 
   document.getElementById("fValor").value = "";
   document.getElementById("fResultado").value = "";
   document.getElementById("fValor").focus();
+  await carregarOperacoes();
   toast(resultadoSelecionado === "WIN" ? "WIN registrado! 🟢" : "LOSS registrado. 🔴", "ok");
 }
 
-function excluirOp(id) {
+async function excluirOp(id) {
   const op = state.operacoes.find((o) => o.id === id);
   if (!op) return;
   if (!confirm(`Excluir a operação de ${fmtDataBR(op.data)}?`)) return;
-  state.operacoes = state.operacoes.filter((o) => o.id !== id);
-  render();
+
+  const { error } = await supa.from("operacoes").delete().eq("id", id);
+  if (error) return toast("Erro ao excluir: " + error.message, "err");
+  await carregarOperacoes();
   toast("Operação excluída.", "ok");
 }
 
@@ -360,10 +400,9 @@ function fecharEdit() {
   editandoId = null;
 }
 
-function salvarEdit(e) {
+async function salvarEdit(e) {
   e.preventDefault();
-  const op = state.operacoes.find((o) => o.id === editandoId);
-  if (!op) return fecharEdit();
+  if (editandoId == null) return fecharEdit();
 
   const data = document.getElementById("eData").value;
   const valor = parseMoney(document.getElementById("eValor").value);
@@ -373,18 +412,24 @@ function salvarEdit(e) {
   if (isNaN(valor) || valor < 0) return toast("Valor por entrada inválido.", "err");
   if (isNaN(resultadoVal) || resultadoVal < 0) return toast("Valor do resultado inválido.", "err");
 
-  op.data = data;
-  op.valor = valor;
-  op.resultado = resultadoEdit;
-  op.lucro = resultadoEdit === "WIN" ? resultadoVal : 0;
-  op.perda = resultadoEdit === "LOSS" ? resultadoVal : 0;
+  const { error } = await supa
+    .from("operacoes")
+    .update({
+      data,
+      valor,
+      resultado: resultadoEdit,
+      lucro: resultadoEdit === "WIN" ? resultadoVal : 0,
+      perda: resultadoEdit === "LOSS" ? resultadoVal : 0,
+    })
+    .eq("id", editandoId);
+  if (error) return toast("Erro ao atualizar: " + error.message, "err");
 
   fecharEdit();
-  render();
+  await carregarOperacoes();
   toast("Operação atualizada. ✏️", "ok");
 }
 
-/* ---------- Toggle resultado ---------- */
+/* ---------- Toggle resultado (formulário principal) ---------- */
 function setResultado(res) {
   resultadoSelecionado = res;
   document.getElementById("tgWin").classList.toggle("is-active", res === "WIN");
@@ -411,11 +456,12 @@ function abrirConfig() {
 function fecharConfig() {
   document.getElementById("modalConfig").hidden = true;
 }
-function salvarConfig() {
+async function salvarConfig() {
   const v = parseMoney(document.getElementById("mBancaInicial").value);
   state.bancaInicial = isNaN(v) ? 0 : v;
   fecharConfig();
   render();
+  await salvarPerfil();
   toast("Banca inicial atualizada.", "ok");
 }
 
@@ -433,25 +479,32 @@ function exportar() {
 
 function importar(file) {
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const data = JSON.parse(reader.result);
       if (!data || !Array.isArray(data.operacoes)) throw new Error("formato");
-      state = {
-        titulo: data.titulo ?? state.titulo,
-        bancaInicial: Number(data.bancaInicial) || 0,
-        operacoes: data.operacoes.map((o, i) => ({
-          id: o.id ?? i + 1,
-          data: o.data,
-          valor: Number(o.valor) || 0,
-          resultado: o.resultado === "LOSS" ? "LOSS" : "WIN",
-          lucro: Number(o.lucro) || 0,
-          perda: Number(o.perda) || 0,
-        })),
-      };
-      render();
+
+      const linhas = data.operacoes.map((o) => ({
+        user_id: user.id,
+        data: o.data,
+        valor: Number(o.valor) || 0,
+        resultado: o.resultado === "LOSS" ? "LOSS" : "WIN",
+        lucro: Number(o.lucro) || 0,
+        perda: Number(o.perda) || 0,
+      }));
+
+      if (linhas.length) {
+        const { error } = await supa.from("operacoes").insert(linhas);
+        if (error) throw error;
+      }
+      if (data.bancaInicial != null || data.titulo) {
+        state.bancaInicial = Number(data.bancaInicial) || state.bancaInicial;
+        state.titulo = data.titulo || state.titulo;
+        await salvarPerfil();
+      }
+      await carregarDados();
       toast("Dados importados com sucesso.", "ok");
-    } catch {
+    } catch (err) {
       toast("Arquivo inválido.", "err");
     }
   };
@@ -475,11 +528,12 @@ function toast(msg, tipo = "") {
 /* ---------- Título editável ---------- */
 function setupTitulo() {
   const h1 = document.getElementById("tituloApp");
-  const commit = () => {
+  const commit = async () => {
     const txt = h1.textContent.trim() || "TABELA DA LOBO";
     h1.textContent = txt;
+    if (txt === state.titulo) return;
     state.titulo = txt;
-    save();
+    if (user) await salvarPerfil();
   };
   h1.addEventListener("blur", commit);
   h1.addEventListener("keydown", (e) => {
@@ -487,8 +541,78 @@ function setupTitulo() {
   });
 }
 
-/* ---------- Init ---------- */
-function init() {
+/* ============================================================
+   AUTENTICAÇÃO
+   ============================================================ */
+
+function authMsg(msg, tipo = "") {
+  const el = document.getElementById("authMsg");
+  el.textContent = msg;
+  el.className = "auth-msg " + tipo;
+}
+
+function traduzErro(m) {
+  if (/Invalid login credentials/i.test(m)) return "E-mail ou senha incorretos.";
+  if (/already registered|already exists/i.test(m)) return "Este e-mail já tem conta. Tente entrar.";
+  if (/Email not confirmed/i.test(m)) return "Confirme seu e-mail antes de entrar (veja sua caixa de entrada).";
+  if (/Password should be at least/i.test(m)) return "A senha precisa ter pelo menos 6 caracteres.";
+  if (/rate limit|too many/i.test(m)) return "Muitas tentativas. Aguarde um pouco e tente de novo.";
+  return m;
+}
+
+async function entrar(e) {
+  if (e) e.preventDefault();
+  const email = document.getElementById("authEmail").value.trim();
+  const senha = document.getElementById("authSenha").value;
+  if (!email || !senha) return authMsg("Preencha e-mail e senha.", "err");
+
+  authMsg("Entrando...");
+  const { error } = await supa.auth.signInWithPassword({ email, password: senha });
+  if (error) authMsg(traduzErro(error.message), "err");
+  // sucesso → o listener onAuthStateChange carrega o app
+}
+
+async function criarConta() {
+  const email = document.getElementById("authEmail").value.trim();
+  const senha = document.getElementById("authSenha").value;
+  if (!email || senha.length < 6) return authMsg("Informe um e-mail válido e senha de 6+ caracteres.", "err");
+
+  authMsg("Criando conta...");
+  const { data, error } = await supa.auth.signUp({ email, password: senha });
+  if (error) return authMsg(traduzErro(error.message), "err");
+
+  if (data.session) authMsg("Conta criada! Entrando...", "ok");
+  else authMsg("Conta criada! Confirme pelo link enviado ao seu e-mail e depois faça login.", "ok");
+}
+
+async function sair() {
+  await supa.auth.signOut();
+  toast("Você saiu.", "ok");
+}
+
+async function aplicarSessao(session) {
+  user = session?.user ?? null;
+  const app = document.querySelector(".app");
+  const auth = document.getElementById("authScreen");
+
+  if (user) {
+    auth.hidden = true;
+    app.hidden = false;
+    document.getElementById("userEmail").textContent = user.email;
+    document.getElementById("authSenha").value = "";
+    await carregarDados();
+  } else {
+    app.hidden = true;
+    auth.hidden = false;
+    state = { titulo: "TABELA DA LOBO", bancaInicial: 25, operacoes: [] };
+  }
+}
+
+/* ============================================================
+   INICIALIZAÇÃO
+   ============================================================ */
+
+function wireEvents() {
   // data padrão = hoje
   document.getElementById("fData").value = new Date().toISOString().slice(0, 10);
 
@@ -527,11 +651,49 @@ function init() {
     e.target.value = "";
   });
 
+  // Autenticação
+  document.getElementById("formAuth").addEventListener("submit", entrar);
+  document.getElementById("btnCriar").addEventListener("click", criarConta);
+  document.getElementById("btnSair").addEventListener("click", sair);
+
   setupTitulo();
   setResultado("WIN");
-  render();
-
   window.addEventListener("resize", renderGrafico);
 }
 
-document.addEventListener("DOMContentLoaded", init);
+async function boot() {
+  wireEvents();
+
+  // Supabase ainda não configurado (config.js sem chaves)
+  if (!configurado()) {
+    document.querySelector(".app").hidden = true;
+    document.getElementById("authScreen").hidden = false;
+    document.getElementById("authConfig").hidden = false;
+    document
+      .getElementById("formAuth")
+      .querySelectorAll("input, button")
+      .forEach((el) => (el.disabled = true));
+    return;
+  }
+
+  // Biblioteca do Supabase não carregou (sem internet, CDN bloqueado…)
+  if (!window.supabase) {
+    document.querySelector(".app").hidden = true;
+    document.getElementById("authScreen").hidden = false;
+    authMsg("Não foi possível carregar o Supabase. Verifique sua conexão com a internet.", "err");
+    return;
+  }
+
+  supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // sessão atual (se o usuário já estava logado)
+  const { data } = await supa.auth.getSession();
+  await aplicarSessao(data.session);
+
+  // reage a login / logout
+  supa.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_IN" || event === "SIGNED_OUT") aplicarSessao(session);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", boot);

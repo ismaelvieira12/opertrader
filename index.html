@@ -9,7 +9,32 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>" />
 </head>
 <body>
-  <div class="app">
+  <!-- ===== Tela de login / cadastro ===== -->
+  <div class="auth" id="authScreen" hidden>
+    <div class="auth-box">
+      <div class="auth-brand">
+        <span class="brand-mark">🐺</span>
+        <h1>TABELA DA LOBO</h1>
+      </div>
+      <p class="auth-sub">Crie sua conta ou entre para ver e registrar as suas operações.</p>
+      <form id="formAuth" autocomplete="on">
+        <label class="field">
+          <span>E-mail</span>
+          <input type="email" id="authEmail" required placeholder="voce@email.com" />
+        </label>
+        <label class="field">
+          <span>Senha</span>
+          <input type="password" id="authSenha" required minlength="6" placeholder="mínimo 6 caracteres" />
+        </label>
+        <button type="submit" class="btn btn-primary btn-block" id="btnEntrar">Entrar</button>
+        <button type="button" class="btn btn-ghost btn-block" id="btnCriar">Criar conta</button>
+      </form>
+      <p class="auth-msg" id="authMsg"></p>
+      <p class="auth-config" id="authConfig" hidden>⚠️ Configure o Supabase no arquivo <b>config.js</b> para ativar o login. Veja o passo a passo no README.</p>
+    </div>
+  </div>
+
+  <div class="app" hidden>
     <!-- ===== Topbar ===== -->
     <header class="topbar">
       <div class="brand">
@@ -20,9 +45,11 @@
         </div>
       </div>
       <div class="topbar-actions">
+        <span class="user-email" id="userEmail" title="Conta conectada"></span>
         <button class="btn btn-ghost" id="btnConfig" type="button">⚙️ Banca inicial</button>
         <button class="btn btn-ghost" id="btnExportar" type="button">⬇️ Exportar</button>
         <button class="btn btn-ghost" id="btnImportar" type="button">⬆️ Importar</button>
+        <button class="btn btn-ghost" id="btnSair" type="button">🚪 Sair</button>
         <input type="file" id="inputImportar" accept="application/json" hidden />
       </div>
     </header>
@@ -145,7 +172,7 @@
     </section>
 
     <footer class="footer">
-      <span>Os dados ficam salvos apenas neste navegador. Use <b>Exportar</b> para guardar um backup.</span>
+      <span>Seus dados ficam salvos na sua conta e sincronizam em qualquer aparelho. Use <b>Exportar</b> para guardar um backup extra.</span>
     </footer>
   </div>
 
@@ -200,6 +227,10 @@
 
   <div class="toast" id="toast" hidden></div>
 
+  <!-- Biblioteca do Supabase (banco de dados + login) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Suas chaves do Supabase (edite este arquivo) -->
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
