@@ -19,7 +19,7 @@ function configurado() {
 }
 
 /* ---------- Estado (cache em memória do usuário logado) ---------- */
-let state = { titulo: "TABELA DA LOBO", bancaInicial: 25, operacoes: [] };
+let state = { titulo: "OPERTRADER", bancaInicial: 25, operacoes: [] };
 let filtroAtual = "ALL";
 let resultadoSelecionado = "WIN";
 let periodoAtual = "dia";
@@ -212,25 +212,25 @@ function renderGrafico() {
 
   // grade horizontal + labels do eixo Y
   const linhas = 4;
-  ctx.font = "11px Inter, system-ui, sans-serif";
+  ctx.font = '10px "JetBrains Mono", ui-monospace, monospace';
   ctx.textBaseline = "middle";
   for (let i = 0; i <= linhas; i++) {
     const val = min + (i / linhas) * (max - min);
     const yy = y(val);
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.strokeStyle = "rgba(56,245,228,0.07)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(pad.left, yy);
     ctx.lineTo(pad.left + w, yy);
     ctx.stroke();
-    ctx.fillStyle = "#61708b";
+    ctx.fillStyle = "#6b7ba0";
     ctx.textAlign = "right";
     ctx.fillText(USD.format(val), pad.left - 8, yy);
   }
 
   // linha de referência da banca inicial
   const yBase = y(state.bancaInicial);
-  ctx.strokeStyle = "rgba(138,153,179,0.35)";
+  ctx.strokeStyle = "rgba(155,140,255,0.45)";
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
   ctx.moveTo(pad.left, yBase);
@@ -240,8 +240,8 @@ function renderGrafico() {
 
   const ultimo = serie[serie.length - 1].valor;
   const subiu = ultimo >= state.bancaInicial;
-  const cor = subiu ? "#2ee27b" : "#f0524b";
-  const corSoft = subiu ? "rgba(46,226,123,0.18)" : "rgba(240,82,75,0.16)";
+  const cor = subiu ? "#2ffb9a" : "#ff5d7a";
+  const corSoft = subiu ? "rgba(47,251,154,0.22)" : "rgba(255,93,122,0.20)";
 
   // área preenchida
   const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + h);
@@ -255,7 +255,11 @@ function renderGrafico() {
   ctx.fillStyle = grad;
   ctx.fill();
 
-  // linha
+  // linha + pontos com brilho neon
+  ctx.save();
+  ctx.shadowColor = cor;
+  ctx.shadowBlur = 16;
+
   ctx.beginPath();
   serie.forEach((p, i) => (i === 0 ? ctx.moveTo(x(i), y(p.valor)) : ctx.lineTo(x(i), y(p.valor))));
   ctx.strokeStyle = cor;
@@ -263,16 +267,16 @@ function renderGrafico() {
   ctx.lineJoin = "round";
   ctx.stroke();
 
-  // pontos
   serie.forEach((p, i) => {
     ctx.beginPath();
     ctx.arc(x(i), y(p.valor), i === serie.length - 1 ? 4.5 : 3, 0, Math.PI * 2);
-    ctx.fillStyle = i === serie.length - 1 ? cor : "#0a0e17";
+    ctx.fillStyle = i === serie.length - 1 ? cor : "#080c17";
     ctx.strokeStyle = cor;
     ctx.lineWidth = 2;
     ctx.fill();
     ctx.stroke();
   });
+  ctx.restore();
 }
 
 /* ============================================================
@@ -315,69 +319,81 @@ function agruparGanhos(modo) {
   return arr;
 }
 
+let ganhoIndex = 0; // 0 = período mais recente
+
 function renderGanhos() {
-  const tbody = document.getElementById("tbodyGanhos");
+  const hero = document.getElementById("periodHero");
+  const tbody = document.getElementById("tbodyPeriodo");
   const empty = document.getElementById("emptyGanhos");
-  const table = document.getElementById("tabelaGanhos");
+  const table = document.getElementById("tabelaPeriodo");
   if (!tbody) return;
 
-  const grupos = agruparGanhos(periodoAtual);
+  const NOMES = { dia: "Diário", mes: "Mensal", tri: "Trimestral", sem: "Semestral", ano: "Anual" };
+  document.getElementById("gKicker").textContent = NOMES[periodoAtual];
 
-  // ----- Cards de resumo -----
-  const totalLiq = grupos.reduce((s, g) => s + g.liquido, 0);
-  const positivos = grupos.filter((g) => g.liquido > 0).length;
-  const melhor = grupos.reduce((b, g) => (g.liquido > (b ? b.liquido : -Infinity) ? g : b), null);
+  const grupos = agruparGanhos(periodoAtual); // mais recente primeiro
+  const totalGeral = grupos.reduce((s, g) => s + g.liquido, 0);
+  document.getElementById("gPeriodosCount").textContent = grupos.length;
+  const tg = document.getElementById("gTotalGeral");
+  tg.textContent = (totalGeral < 0 ? "-" : totalGeral > 0 ? "+" : "") + fmtMoney(Math.abs(totalGeral)).replace("-", "");
+  tg.className = totalGeral > 0 ? "pos" : totalGeral < 0 ? "neg" : "";
 
-  const gTotal = document.getElementById("gTotal");
-  gTotal.textContent = (totalLiq < 0 ? "-" : "") + fmtMoney(Math.abs(totalLiq)).replace("-", "");
-  gTotal.className = "stat-value " + (totalLiq > 0 ? "pos" : totalLiq < 0 ? "neg" : "");
-
-  document.getElementById("gMelhorLabel").textContent = "Melhor " + NOME_PERIODO[periodoAtual];
-  const gMelhor = document.getElementById("gMelhor");
-  gMelhor.textContent = melhor ? fmtMoney(melhor.liquido) : "—";
-  gMelhor.className = "stat-value " + (melhor && melhor.liquido > 0 ? "pos" : melhor && melhor.liquido < 0 ? "neg" : "");
-  document.getElementById("gMelhorFoot").textContent = melhor ? melhor.label : "";
-
-  document.getElementById("gPositivos").textContent = positivos;
-  document.getElementById("gPositivosFoot").textContent =
-    `de ${grupos.length} ${grupos.length === 1 ? "período" : "períodos"}`;
-
-  // ----- Tabela -----
   if (grupos.length === 0) {
+    hero.style.display = "none";
     table.style.display = "none";
     empty.style.display = "block";
     tbody.innerHTML = "";
     return;
   }
+  hero.style.display = "";
   table.style.display = "table";
   empty.style.display = "none";
 
-  const maxAbs = Math.max(1, ...grupos.map((g) => Math.abs(g.liquido)));
+  ganhoIndex = Math.max(0, Math.min(ganhoIndex, grupos.length - 1));
+  const atual = grupos[ganhoIndex];
 
-  tbody.innerHTML = grupos
-    .map((g) => {
-      const pos = g.liquido >= 0;
-      const largura = Math.max(2, Math.round((Math.abs(g.liquido) / maxAbs) * 90));
-      const sinal = g.liquido > 0 ? "+" : g.liquido < 0 ? "-" : "";
-      const lucroCell = g.lucro ? `<span class="pos">${fmtMoney(g.lucro)}</span>` : `<span class="muted-cell">—</span>`;
-      const perdaCell = g.perda ? `<span class="neg">${fmtMoney(g.perda)}</span>` : `<span class="muted-cell">—</span>`;
+  // navegação (◀ = mais antigo, ▶ = mais novo)
+  document.getElementById("gPeriodoLabel").textContent = atual.label;
+  document.getElementById("gPrev").disabled = ganhoIndex >= grupos.length - 1;
+  document.getElementById("gNext").disabled = ganhoIndex <= 0;
+
+  // resultado do período em destaque
+  const net = document.getElementById("gNet");
+  net.textContent = (atual.liquido < 0 ? "-" : atual.liquido > 0 ? "+" : "") + fmtMoney(Math.abs(atual.liquido)).replace("-", "");
+  net.className = "period-net " + (atual.liquido > 0 ? "pos" : atual.liquido < 0 ? "neg" : "");
+
+  document.getElementById("gOps").textContent = atual.ops;
+  document.getElementById("gTaxa").textContent = `${atual.taxa.toFixed(0)}%`;
+  document.getElementById("gWL").textContent = `${atual.wins} / ${atual.losses}`;
+  document.getElementById("gLucro").textContent = fmtMoney(atual.lucro);
+  document.getElementById("gPerda").textContent = fmtMoney(atual.perda);
+
+  // operações desse período (mais recente primeiro)
+  const ops = opsOrdenadas()
+    .filter((o) => chavePeriodo(o.data, periodoAtual).key === atual.key)
+    .reverse();
+  tbody.innerHTML = ops
+    .map((o) => {
+      const tag = o.resultado === "WIN"
+        ? `<span class="tag tag-win">✔ WIN</span>`
+        : `<span class="tag tag-loss">✖ LOSS</span>`;
+      const lucroCell = o.lucro ? `<span class="pos">${fmtMoney(o.lucro)}</span>` : `<span class="muted-cell">—</span>`;
+      const perdaCell = o.perda ? `<span class="neg">${fmtMoney(o.perda)}</span>` : `<span class="muted-cell">—</span>`;
       return `
         <tr>
-          <td><b>${g.label}</b></td>
-          <td class="num">${g.ops}</td>
-          <td class="center"><span class="wl"><span class="pos">${g.wins}</span> / <span class="neg">${g.losses}</span></span></td>
-          <td class="num">${g.taxa.toFixed(0)}%</td>
+          <td>${fmtDataBR(o.data)}</td>
+          <td class="num">${fmtMoney(o.valor)}</td>
           <td class="num">${lucroCell}</td>
           <td class="num">${perdaCell}</td>
-          <td class="num res-col">
-            <span class="res-wrap">
-              <span class="res-bar ${pos ? "pos" : "neg"}" style="width:${largura}px"></span>
-              <b class="${pos ? "pos" : "neg"}">${sinal}${fmtMoney(Math.abs(g.liquido)).replace("-", "")}</b>
-            </span>
-          </td>
+          <td class="center">${tag}</td>
         </tr>`;
     })
     .join("");
+}
+
+function navGanho(delta) {
+  ganhoIndex += delta;
+  renderGanhos();
 }
 
 /* ---------- Troca de abas / período ---------- */
@@ -392,6 +408,7 @@ function setView(view, btn) {
 
 function setPeriodo(p, btn) {
   periodoAtual = p;
+  ganhoIndex = 0; // volta ao período mais recente ao trocar a granularidade
   document.querySelectorAll("[data-period]").forEach((c) => c.classList.remove("is-active"));
   if (btn) btn.classList.add("is-active");
   renderGanhos();
@@ -417,12 +434,17 @@ async function carregarPerfil() {
 
   if (!data) {
     // primeiro acesso do usuário: cria o perfil padrão
-    await supa.from("perfil").insert({ user_id: user.id });
+    await supa.from("perfil").insert({ user_id: user.id, titulo: "OPERTRADER" });
     state.bancaInicial = 25;
-    state.titulo = "TABELA DA LOBO";
+    state.titulo = "OPERTRADER";
   } else {
     state.bancaInicial = Number(data.banca_inicial) || 0;
-    state.titulo = data.titulo || "TABELA DA LOBO";
+    state.titulo = data.titulo || "OPERTRADER";
+    // migração: substitui nomes antigos padrão pelo novo automaticamente
+    if (state.titulo === "TABELA DA LOBO" || state.titulo === "ENTRADAS OPERTRADER") {
+      state.titulo = "OPERTRADER";
+      await salvarPerfil();
+    }
   }
 }
 
@@ -653,7 +675,7 @@ function toast(msg, tipo = "") {
 function setupTitulo() {
   const h1 = document.getElementById("tituloApp");
   const commit = async () => {
-    const txt = h1.textContent.trim() || "TABELA DA LOBO";
+    const txt = h1.textContent.trim() || "OPERTRADER";
     h1.textContent = txt;
     if (txt === state.titulo) return;
     state.titulo = txt;
@@ -728,7 +750,7 @@ async function aplicarSessao(session) {
   } else {
     app.hidden = true;
     auth.hidden = false;
-    state = { titulo: "TABELA DA LOBO", bancaInicial: 25, operacoes: [] };
+    state = { titulo: "OPERTRADER", bancaInicial: 25, operacoes: [] };
   }
 }
 
@@ -753,6 +775,8 @@ function wireEvents() {
   document.querySelectorAll("[data-view]").forEach((btn) => {
     btn.addEventListener("click", () => setView(btn.dataset.view, btn));
   });
+  document.getElementById("gPrev").addEventListener("click", () => navGanho(1));
+  document.getElementById("gNext").addEventListener("click", () => navGanho(-1));
 
   document.getElementById("btnConfig").addEventListener("click", abrirConfig);
   document.getElementById("mSalvar").addEventListener("click", salvarConfig);

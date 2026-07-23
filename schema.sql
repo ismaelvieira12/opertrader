@@ -23,7 +23,7 @@ create index if not exists operacoes_user_id_idx on public.operacoes (user_id);
 create table if not exists public.perfil (
   user_id        uuid primary key references auth.users (id) on delete cascade,
   banca_inicial  numeric not null default 25,
-  titulo         text not null default 'TABELA DA LOBO'
+  titulo         text not null default 'OPERTRADER'
 );
 
 -- 3) Liga a Segurança por Linha (Row Level Security)

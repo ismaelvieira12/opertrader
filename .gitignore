@@ -8,3 +8,7 @@ Desktop.ini
 
 # Backup exportado pelo próprio site
 tabela-da-lobo.json
+
+# Skills instaladas localmente (npx skills)
+.agents/
+skills-lock.json

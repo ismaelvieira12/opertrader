@@ -3,18 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tabela da Lobo — Histórico de Operações</title>
+  <title>OperTrader — Histórico de Operações</title>
   <meta name="description" content="Registro e histórico das minhas operações de trade." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Orbitron:wght@700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐺</text></svg>" />
 </head>
 <body>
+  <!-- ===== Atmosfera (aurora + grade holográfica) ===== -->
+  <div class="fx" aria-hidden="true">
+    <span class="fx-blob fx-b1"></span>
+    <span class="fx-blob fx-b2"></span>
+    <span class="fx-blob fx-b3"></span>
+    <span class="fx-grid"></span>
+  </div>
+
   <!-- ===== Tela de login / cadastro ===== -->
   <div class="auth" id="authScreen" hidden>
     <div class="auth-box">
       <div class="auth-brand">
         <span class="brand-mark">🐺</span>
-        <h1>TABELA DA LOBO</h1>
+        <h1>OPERTRADER</h1>
       </div>
       <p class="auth-sub">Crie sua conta ou entre para ver e registrar as suas operações.</p>
       <form id="formAuth" autocomplete="on">
@@ -40,7 +51,7 @@
       <div class="brand">
         <span class="brand-mark">🐺</span>
         <div class="brand-text">
-          <h1 id="tituloApp" contenteditable="true" spellcheck="false" title="Clique para editar o título">TABELA DA LOBO</h1>
+          <h1 id="tituloApp" contenteditable="true" spellcheck="false" title="Clique para editar o título">OPERTRADER</h1>
           <p class="brand-sub">Histórico de Operações</p>
         </div>
       </div>
@@ -183,49 +194,60 @@
 
     <!-- ================= ABA: GANHOS ================= -->
     <div class="view" id="viewGanhos" hidden>
-      <section class="stats stats-ganhos" aria-label="Resumo dos ganhos">
-        <article class="stat-card accent-banca">
-          <span class="stat-label">Resultado Total</span>
-          <strong class="stat-value" id="gTotal">$0.00</strong>
-          <span class="stat-foot">Lucros − perdas de tudo</span>
-        </article>
-        <article class="stat-card">
-          <span class="stat-label" id="gMelhorLabel">Melhor período</span>
-          <strong class="stat-value" id="gMelhor">—</strong>
-          <span class="stat-foot" id="gMelhorFoot"></span>
-        </article>
-        <article class="stat-card">
-          <span class="stat-label">Períodos positivos</span>
-          <strong class="stat-value" id="gPositivos">0</strong>
-          <span class="stat-foot" id="gPositivosFoot">de 0 períodos</span>
-        </article>
+      <!-- granularidade -->
+      <div class="ganhos-gran">
+        <div class="filter period-filter" role="tablist">
+          <button class="chip is-active" data-period="dia" type="button">Diário</button>
+          <button class="chip" data-period="mes" type="button">Mensal</button>
+          <button class="chip" data-period="tri" type="button">Trimestral</button>
+          <button class="chip" data-period="sem" type="button">Semestral</button>
+          <button class="chip" data-period="ano" type="button">Anual</button>
+        </div>
+      </div>
+
+      <!-- navegador de período + resultado -->
+      <section class="card period-hero" id="periodHero">
+        <div class="period-nav">
+          <button class="nav-arrow" id="gPrev" type="button" aria-label="Período anterior">◀</button>
+          <div class="period-title">
+            <span class="period-kicker" id="gKicker">Diário</span>
+            <strong id="gPeriodoLabel">—</strong>
+          </div>
+          <button class="nav-arrow" id="gNext" type="button" aria-label="Próximo período">▶</button>
+        </div>
+        <div class="period-result">
+          <strong class="period-net" id="gNet">$0.00</strong>
+          <span class="period-net-label">Resultado do período</span>
+        </div>
+        <div class="period-substats">
+          <div><span id="gOps">0</span><small>operações</small></div>
+          <div><span id="gTaxa">0%</span><small>acerto</small></div>
+          <div><span id="gWL">0 / 0</span><small>W / L</small></div>
+          <div><span class="pos" id="gLucro">$0.00</span><small>lucro</small></div>
+          <div><span class="neg" id="gPerda">$0.00</span><small>perda</small></div>
+        </div>
+        <div class="period-footer">
+          Total geral (<span id="gPeriodosCount">0</span> períodos): <b id="gTotalGeral">$0.00</b>
+        </div>
       </section>
 
+      <!-- operações do período -->
       <section class="card table-card">
         <div class="card-head">
-          <h2>Ganhos por período</h2>
-          <div class="filter period-filter" role="tablist">
-            <button class="chip is-active" data-period="dia" type="button">Diário</button>
-            <button class="chip" data-period="mes" type="button">Mensal</button>
-            <button class="chip" data-period="tri" type="button">Trimestral</button>
-            <button class="chip" data-period="sem" type="button">Semestral</button>
-            <button class="chip" data-period="ano" type="button">Anual</button>
-          </div>
+          <h2>Operações do período</h2>
         </div>
         <div class="table-scroll">
-          <table id="tabelaGanhos">
+          <table id="tabelaPeriodo">
             <thead>
               <tr>
-                <th>Período</th>
-                <th class="num">Operações</th>
-                <th class="center">W / L</th>
-                <th class="num">Taxa</th>
+                <th>Data</th>
+                <th class="num">Valor entrada</th>
                 <th class="num">Lucro</th>
                 <th class="num">Perda</th>
-                <th class="num">Resultado</th>
+                <th class="center">Resultado</th>
               </tr>
             </thead>
-            <tbody id="tbodyGanhos"></tbody>
+            <tbody id="tbodyPeriodo"></tbody>
           </table>
           <div class="empty" id="emptyGanhos">
             <span class="empty-emoji">💰</span>
