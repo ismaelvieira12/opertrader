@@ -22,6 +22,7 @@ function configurado() {
 let state = { titulo: "TABELA DA LOBO", bancaInicial: 25, operacoes: [] };
 let filtroAtual = "ALL";
 let resultadoSelecionado = "WIN";
+let periodoAtual = "dia";
 
 /* ---------- Utilidades ---------- */
 const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -93,6 +94,7 @@ function render() {
 
   renderTabela();
   renderGrafico();
+  renderGanhos();
 }
 
 /* ---------- Tabela ---------- */
@@ -274,6 +276,128 @@ function renderGrafico() {
 }
 
 /* ============================================================
+   ABA GANHOS — resumo agrupado por período
+   ============================================================ */
+const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const NOME_PERIODO = { dia: "dia", mes: "mês", tri: "trimestre", sem: "semestre", ano: "ano" };
+
+// Devolve a chave (para ordenar/agrupar) e o rótulo amigável de uma data
+function chavePeriodo(iso, modo) {
+  const [y, m, d] = iso.split("-").map(Number);
+  switch (modo) {
+    case "mes": return { key: `${y}-${String(m).padStart(2, "0")}`, label: `${MESES[m - 1]} de ${y}` };
+    case "tri": { const q = Math.ceil(m / 3); return { key: `${y}-T${q}`, label: `${q}º Trimestre de ${y}` }; }
+    case "sem": { const s = m <= 6 ? 1 : 2; return { key: `${y}-S${s}`, label: `${s}º Semestre de ${y}` }; }
+    case "ano": return { key: `${y}`, label: `${y}` };
+    default:    return { key: iso, label: fmtDataBR(iso) }; // "dia"
+  }
+}
+
+// Agrupa as operações por período e soma os resultados
+function agruparGanhos(modo) {
+  const mapa = new Map();
+  for (const o of state.operacoes) {
+    const { key, label } = chavePeriodo(o.data, modo);
+    let g = mapa.get(key);
+    if (!g) { g = { key, label, ops: 0, wins: 0, losses: 0, lucro: 0, perda: 0 }; mapa.set(key, g); }
+    g.ops++;
+    if (o.resultado === "WIN") g.wins++; else g.losses++;
+    g.lucro += o.lucro || 0;
+    g.perda += o.perda || 0;
+  }
+  const arr = [...mapa.values()].map((g) => ({
+    ...g,
+    liquido: g.lucro - g.perda,
+    taxa: g.ops ? (g.wins / g.ops) * 100 : 0,
+  }));
+  arr.sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0)); // mais recente primeiro
+  return arr;
+}
+
+function renderGanhos() {
+  const tbody = document.getElementById("tbodyGanhos");
+  const empty = document.getElementById("emptyGanhos");
+  const table = document.getElementById("tabelaGanhos");
+  if (!tbody) return;
+
+  const grupos = agruparGanhos(periodoAtual);
+
+  // ----- Cards de resumo -----
+  const totalLiq = grupos.reduce((s, g) => s + g.liquido, 0);
+  const positivos = grupos.filter((g) => g.liquido > 0).length;
+  const melhor = grupos.reduce((b, g) => (g.liquido > (b ? b.liquido : -Infinity) ? g : b), null);
+
+  const gTotal = document.getElementById("gTotal");
+  gTotal.textContent = (totalLiq < 0 ? "-" : "") + fmtMoney(Math.abs(totalLiq)).replace("-", "");
+  gTotal.className = "stat-value " + (totalLiq > 0 ? "pos" : totalLiq < 0 ? "neg" : "");
+
+  document.getElementById("gMelhorLabel").textContent = "Melhor " + NOME_PERIODO[periodoAtual];
+  const gMelhor = document.getElementById("gMelhor");
+  gMelhor.textContent = melhor ? fmtMoney(melhor.liquido) : "—";
+  gMelhor.className = "stat-value " + (melhor && melhor.liquido > 0 ? "pos" : melhor && melhor.liquido < 0 ? "neg" : "");
+  document.getElementById("gMelhorFoot").textContent = melhor ? melhor.label : "";
+
+  document.getElementById("gPositivos").textContent = positivos;
+  document.getElementById("gPositivosFoot").textContent =
+    `de ${grupos.length} ${grupos.length === 1 ? "período" : "períodos"}`;
+
+  // ----- Tabela -----
+  if (grupos.length === 0) {
+    table.style.display = "none";
+    empty.style.display = "block";
+    tbody.innerHTML = "";
+    return;
+  }
+  table.style.display = "table";
+  empty.style.display = "none";
+
+  const maxAbs = Math.max(1, ...grupos.map((g) => Math.abs(g.liquido)));
+
+  tbody.innerHTML = grupos
+    .map((g) => {
+      const pos = g.liquido >= 0;
+      const largura = Math.max(2, Math.round((Math.abs(g.liquido) / maxAbs) * 90));
+      const sinal = g.liquido > 0 ? "+" : g.liquido < 0 ? "-" : "";
+      const lucroCell = g.lucro ? `<span class="pos">${fmtMoney(g.lucro)}</span>` : `<span class="muted-cell">—</span>`;
+      const perdaCell = g.perda ? `<span class="neg">${fmtMoney(g.perda)}</span>` : `<span class="muted-cell">—</span>`;
+      return `
+        <tr>
+          <td><b>${g.label}</b></td>
+          <td class="num">${g.ops}</td>
+          <td class="center"><span class="wl"><span class="pos">${g.wins}</span> / <span class="neg">${g.losses}</span></span></td>
+          <td class="num">${g.taxa.toFixed(0)}%</td>
+          <td class="num">${lucroCell}</td>
+          <td class="num">${perdaCell}</td>
+          <td class="num res-col">
+            <span class="res-wrap">
+              <span class="res-bar ${pos ? "pos" : "neg"}" style="width:${largura}px"></span>
+              <b class="${pos ? "pos" : "neg"}">${sinal}${fmtMoney(Math.abs(g.liquido)).replace("-", "")}</b>
+            </span>
+          </td>
+        </tr>`;
+    })
+    .join("");
+}
+
+/* ---------- Troca de abas / período ---------- */
+function setView(view, btn) {
+  document.querySelectorAll(".tab").forEach((t) => t.classList.remove("is-active"));
+  if (btn) btn.classList.add("is-active");
+  document.getElementById("viewOperacoes").hidden = view !== "operacoes";
+  document.getElementById("viewGanhos").hidden = view !== "ganhos";
+  if (view === "ganhos") renderGanhos();
+  else renderGrafico(); // recalcula o gráfico ao voltar (canvas estava oculto)
+}
+
+function setPeriodo(p, btn) {
+  periodoAtual = p;
+  document.querySelectorAll("[data-period]").forEach((c) => c.classList.remove("is-active"));
+  if (btn) btn.classList.add("is-active");
+  renderGanhos();
+}
+
+/* ============================================================
    CAMADA DE DADOS (Supabase)
    ============================================================ */
 
@@ -440,7 +564,7 @@ function setResultado(res) {
 /* ---------- Filtro da tabela ---------- */
 function setFiltro(f, btn) {
   filtroAtual = f;
-  document.querySelectorAll(".chip").forEach((c) => c.classList.remove("is-active"));
+  document.querySelectorAll("[data-filter]").forEach((c) => c.classList.remove("is-active"));
   btn.classList.add("is-active");
   renderTabela();
 }
@@ -620,8 +744,14 @@ function wireEvents() {
   document.getElementById("tgWin").addEventListener("click", () => setResultado("WIN"));
   document.getElementById("tgLoss").addEventListener("click", () => setResultado("LOSS"));
 
-  document.querySelectorAll(".chip").forEach((btn) => {
+  document.querySelectorAll("[data-filter]").forEach((btn) => {
     btn.addEventListener("click", () => setFiltro(btn.dataset.filter, btn));
+  });
+  document.querySelectorAll("[data-period]").forEach((btn) => {
+    btn.addEventListener("click", () => setPeriodo(btn.dataset.period, btn));
+  });
+  document.querySelectorAll("[data-view]").forEach((btn) => {
+    btn.addEventListener("click", () => setView(btn.dataset.view, btn));
   });
 
   document.getElementById("btnConfig").addEventListener("click", abrirConfig);

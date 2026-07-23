@@ -10,6 +10,7 @@ login e banco de dados via **[Supabase](https://supabase.com)** (plano grátis).
 - **Login / cadastro** por e-mail e senha — cada usuário vê apenas os próprios dados.
 - **Placar da banca** — banca atual, lucro líquido, ROI, taxa de acerto e WIN/LOSS.
 - **Gráfico de evolução da banca** desenhado em `<canvas>`.
+- **Aba "Ganhos"** — resumo agrupado por período: diário, mensal, trimestral, semestral e anual.
 - **Registrar, editar (✎) e excluir (🗑)** operações.
 - **Valores em dólar ($)** — o campo aceita tanto `2,50` quanto `2.50`.
 - **Dados na nuvem** (Supabase) + **Exportar/Importar** backup em JSON.

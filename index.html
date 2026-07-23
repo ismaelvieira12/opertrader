@@ -54,6 +54,15 @@
       </div>
     </header>
 
+    <!-- ===== Abas ===== -->
+    <nav class="tabs">
+      <button class="tab is-active" data-view="operacoes" type="button">📊 Operações</button>
+      <button class="tab" data-view="ganhos" type="button">💰 Ganhos</button>
+    </nav>
+
+    <!-- ================= ABA: OPERAÇÕES ================= -->
+    <div class="view" id="viewOperacoes">
+
     <!-- ===== Cards de estatística ===== -->
     <section class="stats" aria-label="Resumo da banca">
       <article class="stat-card accent-banca">
@@ -170,6 +179,62 @@
         </div>
       </div>
     </section>
+    </div><!-- /viewOperacoes -->
+
+    <!-- ================= ABA: GANHOS ================= -->
+    <div class="view" id="viewGanhos" hidden>
+      <section class="stats stats-ganhos" aria-label="Resumo dos ganhos">
+        <article class="stat-card accent-banca">
+          <span class="stat-label">Resultado Total</span>
+          <strong class="stat-value" id="gTotal">$0.00</strong>
+          <span class="stat-foot">Lucros − perdas de tudo</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label" id="gMelhorLabel">Melhor período</span>
+          <strong class="stat-value" id="gMelhor">—</strong>
+          <span class="stat-foot" id="gMelhorFoot"></span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Períodos positivos</span>
+          <strong class="stat-value" id="gPositivos">0</strong>
+          <span class="stat-foot" id="gPositivosFoot">de 0 períodos</span>
+        </article>
+      </section>
+
+      <section class="card table-card">
+        <div class="card-head">
+          <h2>Ganhos por período</h2>
+          <div class="filter period-filter" role="tablist">
+            <button class="chip is-active" data-period="dia" type="button">Diário</button>
+            <button class="chip" data-period="mes" type="button">Mensal</button>
+            <button class="chip" data-period="tri" type="button">Trimestral</button>
+            <button class="chip" data-period="sem" type="button">Semestral</button>
+            <button class="chip" data-period="ano" type="button">Anual</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table id="tabelaGanhos">
+            <thead>
+              <tr>
+                <th>Período</th>
+                <th class="num">Operações</th>
+                <th class="center">W / L</th>
+                <th class="num">Taxa</th>
+                <th class="num">Lucro</th>
+                <th class="num">Perda</th>
+                <th class="num">Resultado</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyGanhos"></tbody>
+          </table>
+          <div class="empty" id="emptyGanhos">
+            <span class="empty-emoji">💰</span>
+            <p>Nenhum ganho para mostrar ainda.</p>
+            <small>Registre operações na aba "Operações" para ver o resumo aqui.</small>
+          </div>
+        </div>
+      </section>
+    </div><!-- /viewGanhos -->
 
     <footer class="footer">
       <span>Seus dados ficam salvos na sua conta e sincronizam em qualquer aparelho. Use <b>Exportar</b> para guardar um backup extra.</span>

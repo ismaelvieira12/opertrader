@@ -462,6 +462,41 @@ td.num { font-variant-numeric: tabular-nums; }
   color: var(--muted);
 }
 
+/* ===== Abas ===== */
+.tabs {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 5px;
+  margin-bottom: 18px;
+}
+.tab {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 9px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.tab.is-active { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+.tab:hover:not(.is-active) { color: var(--text); }
+
+/* ===== Aba Ganhos ===== */
+.stats-ganhos { grid-template-columns: repeat(3, 1fr); }
+.wl { font-variant-numeric: tabular-nums; font-weight: 600; }
+.res-col { min-width: 130px; }
+.res-wrap { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.res-bar { display: inline-block; height: 6px; border-radius: 999px; min-width: 2px; }
+.res-bar.pos { background: linear-gradient(90deg, var(--green), var(--green-line)); }
+.res-bar.neg { background: linear-gradient(90deg, #ff7b73, var(--red)); }
+#tabelaGanhos tbody b { font-weight: 700; }
+
 /* ===== Responsivo ===== */
 @media (max-width: 900px) {
   .stats { grid-template-columns: repeat(2, 1fr); }
